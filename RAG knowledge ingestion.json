@@ -1,0 +1,218 @@
+{
+  "name": "RAG knowledge ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        -256
+      ],
+      "id": "d26ab72b-a6e7-4919-abae-d286fbad028e",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67a76403-fe3d-4b1c-9bf1-1b4c3310248a",
+              "name": "youtube_url",
+              "value": "https://www.youtube.com/watch?v=FlGBvZ-6R-Q",
+              "type": "string"
+            },
+            {
+              "id": "4388b115-290d-4cae-95ad-a875978bf9ae",
+              "name": "video_id",
+              "value": "FlGBvZ-6R-Q",
+              "type": "string"
+            },
+            {
+              "id": "90e07541-a1ac-4556-9abd-c9891c8a4851",
+              "name": "title",
+              "value": "RAG in n8n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        -256
+      ],
+      "id": "f8043f90-e54d-4fc4-a9ef-0a0ca8111e9e",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "youtubeURL": "={{$json.youtube_url}}"
+      },
+      "type": "n8n-nodes-youtube-transcript-api.youtubeTranscriptApi",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        -256
+      ],
+      "id": "ffa2e5f2-4344-40cc-a836-ffa7ccced3fd",
+      "name": "Youtube Transcript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const transcript = $json.transcript || \"\";\nconst chunkSize = 800;\nconst overlap = 120;\n\nconst chunks = [];\n\nfor (let i = 0; i < transcript.length; i += chunkSize - overlap) {\n  const chunk = transcript.slice(i, i + chunkSize).trim();\n\n  if (chunk.length > 0) {\n    chunks.push({\n      json: {\n        pageContent: chunk,\n        title: $json.title,\n        video_id: $json.video_id,\n        youtube_url: $json.youtube_url,\n        chunk_index: chunks.length\n      }\n    });\n  }\n}\n\nreturn chunks;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        -256
+      ],
+      "id": "8687a326-4852-4e2b-9e63-489c29242711",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "youtube_rag",
+          "mode": "list",
+          "cachedResultName": "youtube_rag"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        -288
+      ],
+      "id": "909b2f64-6002-432a-9a7c-9c93a31c36fe",
+      "name": "Qdrant Vector Store",
+      "credentials": {
+        "qdrantApi": {
+          "id": "ujqqnkqH3qSVku9D",
+          "name": "Qdrant account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -80,
+        -80
+      ],
+      "id": "55eaeb88-088a-41e9-9a65-4603320d300a",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "LJRJwEeAyzGYpj1S",
+          "name": "main API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{$json.pageContent}}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        -80
+      ],
+      "id": "3513a73d-e486-40da-b0c5-f5c5e2fd01dd",
+      "name": "Default Data Loader"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Youtube Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Youtube Transcript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a852ffb1-84f7-4c39-9005-900fd857e972",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4518c64eb9180e460b9626661124584bcc65f7380a92a77be9504db062a6324e"
+  },
+  "id": "dv18O8rRyMugRrLX",
+  "tags": []
+}
